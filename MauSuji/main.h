@@ -1,8 +1,8 @@
 
 #ifdef _WIN64
-#define OPENMAUSUJI_VERSION		TEXT("OpenMauSuji ver. 1.33\r\nx64")
+#define OPENMAUSUJI_VERSION		TEXT("OpenMauSuji ver. 1.34\r\nx64")
 #else
-#define OPENMAUSUJI_VERSION		TEXT("OpenMauSuji ver. 1.33\r\nx86")
+#define OPENMAUSUJI_VERSION		TEXT("OpenMauSuji ver. 1.34\r\nx86")
 #endif	//_WIN64
 #define MAUSUJI_VERSION		TEXT("É}ÉEãÿ  ver. 1.41 beta 3\r\nby ÉsÉç")
 #define INI_VERSION			11
