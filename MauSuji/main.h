@@ -95,3 +95,5 @@
 #define S_MOVE_RIGHT		1
 #define S_MOVE_DOWN			2
 #define S_MOVE_LEFT			3
+
+LPTSTR GetGestureString(BYTE* Modifier, int* Button, int* Move, LPTSTR lpszText, int nSize);

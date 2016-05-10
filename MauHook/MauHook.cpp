@@ -3,6 +3,7 @@
 #define _WIN32_WINNT    0x0501
 #define _WIN32_IE       0x0501
 
+#include <stdio.h>
 #include <windows.h>
 #include <commctrl.h>
 
@@ -31,6 +32,7 @@ BOOL ButtonSearchHook = FALSE;
 int Cursor = 3;
 BOOL ButtonFlag = FALSE;
 BOOL HookFlag = TRUE;	//TRUE:フック有効 FALSE:フック無効
+BOOL IgnoreMouseUpFlag = FALSE;
 BOOL SetTargetFlag = FALSE;
 BOOL GetWindowFocusFlag = FALSE;
 HWND WindowFocus = NULL;
@@ -54,6 +56,15 @@ BOOL Wow64Process = FALSE;
 
 #pragma data_seg()
 
+void DebugPrintf(const char *format, ...)
+{
+	char buf[1024] = "";
+	va_list args;
+	va_start(args, format);
+	vsprintf_s(buf, format, args);
+	va_end(args);
+	OutputDebugStringA(buf);
+}
 
 HINSTANCE hInstDLL;		//DLLのインスタンスハンドル
 
@@ -167,6 +178,8 @@ LRESULT CALLBACK MouseHookProc(int nCode, WPARAM wParam, LPARAM lParam)
 	BOOL x86APP;
 #endif
 
+	DebugPrintf("MouseHookProc | nCode: 0x%x, wParam: 0x%x, HookFlag=%d \r\n", nCode, wParam, HookFlag);
+
 	if(nCode==HC_ACTION)
 	{
 		switch(wParam)
@@ -237,7 +250,7 @@ LRESULT CALLBACK MouseHookProc(int nCode, WPARAM wParam, LPARAM lParam)
 			case WM_NCMBUTTONUP:
 			case WM_RBUTTONUP:
 			case WM_NCRBUTTONUP:
-				if(ButtonFlag)
+				if(ButtonFlag || IgnoreMouseUpFlag)
 					return TRUE;
 				break;
 			case WM_XBUTTONDOWN:
@@ -273,7 +286,7 @@ LRESULT CALLBACK MouseHookProc(int nCode, WPARAM wParam, LPARAM lParam)
 				}
 			case WM_XBUTTONUP:
 			case WM_NCXBUTTONUP:
-				if(ButtonFlag)
+				if(ButtonFlag || IgnoreMouseUpFlag)
 					return TRUE;
 				break;
 			default:
@@ -288,6 +301,7 @@ LRESULT CALLBACK MessageHookProc(int nCode, WPARAM wParam, LPARAM lParam)
 {
 	MSG *msg = (MSG *)lParam;
 
+	//DebugPrintf("MessageHookProc | nCode: 0x%x, wParam: 0x%x, HookFlag=%d \r\n", nCode, wParam, HookFlag);
 	if(nCode==HC_ACTION)
 	{
 		switch(Cursor)
@@ -331,6 +345,8 @@ LRESULT CALLBACK MessageHookProc(int nCode, WPARAM wParam, LPARAM lParam)
 
 LRESULT CALLBACK ButtonSearchHookProc(int nCode, WPARAM wParam, LPARAM lParam)
 {
+	DebugPrintf("ButtonSearchHookProc | nCode: 0x%x, wParam: 0x%x, HookFlag=%d \r\n", nCode, wParam, HookFlag);
+
 	CWPSTRUCT *pcwp = (CWPSTRUCT *)lParam;
 	TCHAR buffer[20];
 
@@ -412,6 +428,7 @@ LRESULT CALLBACK LowLevelMouseHookProc(int nCode, WPARAM wParam, LPARAM lParam)
 				SendMessage(CallWnd, MAUHOOK_MSG, 0, 0);
 			break;
 		case WM_MOUSEWHEEL:
+			DebugPrintf("LowLevelMouseHookProc | nCode: 0x%x, wParam: 0x%x, HookFlag=%d \r\n", nCode, wParam, HookFlag);
 			if((SHORT)HIWORD(mousehooks->mouseData) > 0)
 				WheelMessage = WM_MOUSEWHEEL_UP;
 			else
@@ -588,6 +605,11 @@ void SetHookFlag(BOOL fEnable)
 	HookFlag = fEnable;
 }
 
+void SetIgnoreMouseUpFlag(BOOL fEnable)
+{
+	IgnoreMouseUpFlag = fEnable;
+}
+
 void ResetButtonFlag()
 {
 	HookFlag = TRUE;
@@ -598,10 +620,12 @@ void ResetButtonFlag()
 //フックの開始
 void SetMouseHook(HWND hWnd)
 {
+	DebugPrintf("SetMouseHook \r\n");
 	CallWnd = hWnd;
 
 	//誤動作を防止するためとりあえず初期化
 	HookFlag = TRUE;
+	IgnoreMouseUpFlag = FALSE;
 	hwTarget = NULL;
 	ButtonFlag = FALSE;
 
@@ -631,6 +655,7 @@ BOOL CALLBACK PostNullProc(HWND hWnd, LPARAM lParam)
 //フックの終了
 void MouseUnHook(void)
 {
+	DebugPrintf("MouseUnHook \r\n");
 	if(NextMouseHook)
 		UnhookWindowsHookEx(NextMouseHook);
 	if(NextMessageHook)

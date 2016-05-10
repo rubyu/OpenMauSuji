@@ -231,6 +231,7 @@ TCHAR GestureCursor[_MAX_PATH + 1];
 TCHAR WaitCursor[_MAX_PATH + 1];
 
 TCHAR GestureString[50];
+TCHAR DebugGestureString[50];
 TCHAR CommentString[MAX_COMMENT + 1];
 
 POINT MauSujiNavi, TipLocate;
@@ -325,6 +326,24 @@ TCHAR TargetTitle[256] = TEXT("");
 int WindowHook = 0;
 HWND CallDlg1 = NULL;
 HWND CallDlg2 = NULL;
+
+
+void DebugPrintf(const char *format, ...)
+{
+	char buf[1024] = "";
+	va_list args;
+	va_start(args, format);
+	vsprintf_s(buf, format, args);
+	va_end(args);
+	OutputDebugStringA(buf);
+}
+
+void DumpGesture()
+{
+	DebugPrintf("    Gesture.Level: %d, Gesture.Start: %d, Gesture.Modifier: %d, Gesture.Button: 0x%x, GestureString: %s \r\n",
+		Gesture.Level, Gesture.Start, Gesture.Modifier, Gesture.Button,
+		GetGestureString(&Gesture.Modifier, &Gesture.Button, Gesture.Move, DebugGestureString, 50));
+}
 
 //
 int _ListView_HitTest(HWND hwnd, LPLVHITTESTINFO pinfo)
@@ -2948,6 +2967,8 @@ LPTSTR GetGestureString(BYTE* Modifier, int* Button, int* Move, LPTSTR lpszText,
 
 void ExecuteSendKey(int Case, LONG SendKey, int ClickWait)
 {
+	DebugPrintf("ExecuteSendKey | case: %d, sendkey: %d, clickwait: %d \r\n", Case, SendKey, ClickWait);
+
 	UINT modifiers = ((HIBYTE(SendKey) & HOTKEYF_SHIFT) ? MOD_SHIFT : 0) |
 		((HIBYTE(SendKey) & HOTKEYF_CONTROL) ? MOD_CONTROL : 0) |
 		((HIBYTE(SendKey) & HOTKEYF_ALT) ? MOD_ALT : 0) |
@@ -4114,6 +4135,8 @@ HWND SearchCommandTarget(int CommandTarget)
 
 void ImplementCommand(HWND hWnd, int FoundActionNumber, BOOL FinishAction)
 {
+	DebugPrintf("ImplementCommand | hWnd: 0x%x, FinishAction=%d \r\n", hWnd, FinishAction);
+
 	static int FinishCommandNumber = 0;
 	HWND hwTarget;
 	RECT TargetRect;
@@ -4136,6 +4159,12 @@ void ImplementCommand(HWND hWnd, int FoundActionNumber, BOOL FinishAction)
 
 	while(i < Action[FoundActionNumber].Repeat && Action[FoundActionNumber].BreakPoint == 0)
 	{
+		DebugPrintf("[%d/%d] target: %d, case: %d \r\n",
+			i+1, 
+			Action[FoundActionNumber].Repeat, 
+			Action[FoundActionNumber].command[i].CommandTarget, 
+			Action[FoundActionNumber].command[i].Case);
+
 		switch(Action[FoundActionNumber].command[i].CommandTarget)
 		{
 		case -1:
@@ -8245,17 +8274,20 @@ BOOL CheckButtonUp(int ButtonCode)
 			ButtonUpFlag = TRUE;
 		break;
 	}
+	DebugPrintf("ButtonUpFlag: %d \r\n", ButtonUpFlag);
 	return ButtonUpFlag;
 }
 
 void DoubleClickProc(HWND hwnd, UINT id)
 {
+	DebugPrintf("DoubleClickProc | DoubleClickFlag: %d \r\n", DoubleClickFlag);
 	DoubleClickFlag = -1;
 	KillTimer(hwnd, ID_DBLCLKTIMER);
 }
 
 void HookCheckProc(HWND hwnd, UINT id)
 {
+	DebugPrintf("HookCheckProc | HookCheckFlag: %d \r\n", HookCheckFlag);
 	static POINT LastPos = {0,0};
 	POINT TempPos;
 
@@ -8486,6 +8518,9 @@ void FreeScroll(int CursorPosx, int CursorPosy, BOOL ScrollInitFlag, HWND hWnd)
 
 void TimeOutProc(HWND hwnd, UINT id)
 {
+	DebugPrintf("TimeOutProc | GestureTimeOutTimer: %d \r\n", GestureTimeOutTimer);
+	DumpGesture();
+	
 	BOOL GestureTimeOutFlag = FALSE;
 	UINT DownButton, UpButton, XButton = 0x0000;
 
@@ -8536,15 +8571,23 @@ void TimeOutProc(HWND hwnd, UINT id)
 		SetCursorPos(StartPos.x, StartPos.y);
 		if(Gesture.Button == Gesture.Move[0] && DoubleClickFlag == -1)
 		{
+			DebugPrintf("mouse_event | DownButton for 0x%x \r\n", XButton);
+			DebugPrintf("mouse_event | UpButton for 0x%x \r\n", XButton);
+			DebugPrintf("Sleep | %d \r\n", ClickWait * 2);
 			mouse_event(DownButton,0,0,XButton,0);
 			mouse_event(UpButton,0,0,XButton,0);
 			Sleep(ClickWait * 2);
 		}
+		DebugPrintf("mouse_event | DownButton for 0x%x \r\n", XButton);
+		DebugPrintf("Sleep | %d \r\n", ClickWait);
+		DebugPrintf("SetCursorPos | %d, %d \r\n", RealPos.x, RealPos.y);
 		mouse_event(DownButton,0,0,XButton,0);
 		Sleep(ClickWait);
 		SetCursorPos(RealPos.x, RealPos.y);
 		if(CheckButtonUp(Gesture.Button))
 		{
+			DebugPrintf("mouse_event | UpButton for 0x%x \r\n", XButton);
+			DebugPrintf("Sleep | %d \r\n", ClickWait);
 			mouse_event(UpButton,0,0,XButton,0);
 			Sleep(ClickWait);
 		}
@@ -8592,6 +8635,7 @@ void MouseGestureStringUpdate()
 
 void MouseGestureInit()
 {
+	DebugPrintf("MouseGestureInit \r\n");
 	int i;
 	POINT apos;
 
@@ -8624,6 +8668,8 @@ void MouseGestureInit()
 
 void MouseGestureTerm()
 {
+	DebugPrintf("MouseGestureTerm \r\n");
+	
 	if(MouseGestureTrail)
 	{
 		MouseGestureTrailEnd();
@@ -8632,6 +8678,8 @@ void MouseGestureTerm()
 
 void MouseGestureOnMouseMove()
 {
+	//DebugPrintf("MouseGestureOnMouseMove");
+
 	POINT apos;
 	int PosDiffx, PosDiffy;
 
@@ -8708,6 +8756,11 @@ void MouseGesture(int FoundTargetNumber)
 
 LRESULT OnMauHook(HWND hwnd, WPARAM wParam, LPARAM lParam)
 {
+	if (wParam != 0 || Gesture.Button != 0) {
+		DebugPrintf("OnMauHook | HWND: 0x%x, WPARAM:  0x%x, lParam 0x%x \r\n", hwnd, wParam, lParam);
+		DumpGesture();
+	}
+	
 	static int FoundTargetNumber, FoundActionNumber, LastClick = 0;
 	static POINT FirstClickPos;
 	static int ScreenWidth = GetSystemMetrics(SM_CXVIRTUALSCREEN) - 1;
@@ -8742,6 +8795,12 @@ LRESULT OnMauHook(HWND hwnd, WPARAM wParam, LPARAM lParam)
 	case CORNER_BOTTOMLEFT:
 	case CORNER_BOTTOMRIGHT:
 	case 0: //何もボタンが有効でないときにボタンが押された場合の処理
+		
+		// Start point of a gesture.
+		// There is need to set FALSE to IgnoreMouseUpFlag here. Otherwise, 
+		// standard features, for example a click, will not work properly.
+		SetIgnoreMouseUpFlag(FALSE);
+
 		GetCursorPos(&CursorPos);
 		switch(wParam)
 		{
@@ -9147,12 +9206,20 @@ LRESULT OnMauHook(HWND hwnd, WPARAM wParam, LPARAM lParam)
 					{
 						SetHookFlag(FALSE);
 						//シングルクリック
+						DebugPrintf("mouse_event | DownButton for 0x%x \r\n", XButton);
+						DebugPrintf("mouse_event | UpButton for 0x%x \r\n", XButton);
+						DebugPrintf("Sleep | %d \r\n", ClickWait * 2);
+
 						mouse_event(DownButton, 0, 0, XButton, 0);
 						mouse_event(UpButton, 0, 0, XButton, 0);
 						Sleep(ClickWait * 2);
 						if(Gesture.Move[0] == Gesture.Button && DoubleClickFlag == -1)
 						{
 							//ダブルクリック
+							DebugPrintf("mouse_event | DownButton for 0x%x \r\n", XButton);
+							DebugPrintf("mouse_event | UpButton for 0x%x \r\n", XButton);
+							DebugPrintf("Sleep | %d \r\n", ClickWait * 2);
+
 							mouse_event(DownButton, 0, 0, XButton, 0);
 							mouse_event(UpButton, 0, 0, XButton, 0);
 							Sleep(ClickWait * 2);
@@ -9290,6 +9357,11 @@ LRESULT OnMauHook(HWND hwnd, WPARAM wParam, LPARAM lParam)
 	if((Gesture.Level > MAX_GESTURE_LEVEL && Gesture.Start == TRUE) ||
 		(Gesture.Level == MAX_GESTURE_LEVEL + 1 && Gesture.Start == FALSE))
 	{
+		// A single action is completed.
+		// From here to the start of other gesture, there is need to ignore mouse-up events.
+		// Otherwise, it sometimes passes trough the hook for mouse events.
+		SetIgnoreMouseUpFlag(TRUE);
+
 		GestureTimeOutTimer = FALSE;
 		KillTimer(hwnd, ID_TIMER);
 		MouseGestureTerm();
@@ -9315,6 +9387,9 @@ LRESULT OnMauHook(HWND hwnd, WPARAM wParam, LPARAM lParam)
 				lstrcpy(CommentString, TEXT("no entry"));
 				NaviRefresh(hwnd);
 			}
+			//Gesture.Level = MAX_GESTURE_LEVEL;
+			//SetTimer(hwnd, ID_TIMER, CheckInterval, NULL);
+			//return 0;
 		}
 
 		if(Gesture.Button == Gesture.Move[0])	//ダブルクリック
@@ -9386,6 +9461,9 @@ LRESULT OnMauHook(HWND hwnd, WPARAM wParam, LPARAM lParam)
 
 void OnTimer(HWND hwnd, UINT id)
 {
+	DebugPrintf("OnTimer | HWND: 0x%x, id: %d \r\n", hwnd, id);
+	DumpGesture();
+
 	switch(id)
 	{
 	case ID_TIMER:
@@ -9751,6 +9829,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	default:
 		if(msg==WM_TASKBARCREATED && ShowTaskTray)
 			MyTaskTray(hwnd);
+		DebugPrintf("WndProc -> DefWindowProc | hwnd: 0x%x, msg: %d, wParam: 0x%x, lParam: 0x%x \r\n", hwnd, msg, wParam, lParam);
 		return DefWindowProc(hwnd, msg, wParam, lParam);
 	}
 	return 0;

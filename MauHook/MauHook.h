@@ -11,6 +11,7 @@ void SetSendKeyComboHook(HWND, HWND);
 void SetSendKeyComboUnHook(void);
 void SetButtonFlag(BOOL);
 void SetHookFlag(BOOL);
+void SetIgnoreMouseUpFlag(BOOL);
 void ResetButtonFlag(void);
 void SetCursorNumber(int);
 void SetCursorHandle(LPTSTR, LPTSTR, BOOL);
